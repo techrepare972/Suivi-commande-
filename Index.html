@@ -1,0 +1,174 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Suivi des Commandes Clients</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    input, select, textarea, button {
+      margin: 5px 0;
+      padding: 10px;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .urgent {
+      background-color: #ffd4d4;
+    }
+    .hidden {
+      display: none;
+    }
+    @media(max-width: 600px) {
+      th, td {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loginScreen">
+    <h2>Connexion</h2>
+    <input type="password" id="password" placeholder="Mot de passe">
+    <button onclick="checkPassword()">Se connecter</button>
+    <p id="errorMsg" style="color: red;"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <h1>Suivi des Commandes Clients</h1>
+
+    <form id="orderForm">
+      <input type="text" id="client" placeholder="Nom du client" required>
+      <input type="text" id="product" placeholder="Produit commandé" required>
+      <input type="number" id="price" placeholder="Prix d'achat (€)" required>
+      <input type="date" id="deliveryDate" required>
+      <textarea id="comment" placeholder="Commentaire"></textarea>
+      <select id="status" required>
+        <option value="En cours">En cours</option>
+        <option value="Livré">Livré</option>
+        <option value="Annulé">Annulé</option>
+      </select>
+      <button type="submit">Ajouter commande</button>
+    </form>
+
+    <button onclick="exportCSV()">📤 Exporter en CSV</button>
+
+    <table id="ordersTable">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Produit</th>
+          <th>Prix (€)</th>
+          <th>Date de livraison</th>
+          <th>Commentaire</th>
+          <th>Statut</th>
+          <th>État</th>
+          <th>🗑️</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const PASSWORD = "1234";
+
+    function checkPassword() {
+      const input = document.getElementById('password').value;
+      if (input === PASSWORD) {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadOrders();
+      } else {
+        document.getElementById('errorMsg').innerText = "Mot de passe incorrect.";
+      }
+    }
+
+    const form = document.getElementById('orderForm');
+    const tableBody = document.querySelector('#ordersTable tbody');
+
+    function loadOrders() {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      tableBody.innerHTML = '';
+      const today = new Date();
+
+      orders.forEach((order, index) => {
+        const row = document.createElement('tr');
+        const deliveryDate = new Date(order.date);
+        const timeDiff = deliveryDate - today;
+        const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+        if (daysDiff <= 3) row.classList.add('urgent');
+
+        row.innerHTML = `
+          <td>${order.client}</td>
+          <td>${order.product}</td>
+          <td>${order.price}</td>
+          <td>${order.date}</td>
+          <td>${order.comment}</td>
+          <td>${order.status}</td>
+          <td>${daysDiff <= 0 ? '⚠️ Échéance dépassée' : daysDiff <= 3 ? '⚠️ Bientôt' : '✅ OK'}</td>
+          <td><button onclick="deleteOrder(${index})">Supprimer</button></td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const client = document.getElementById('client').value;
+      const product = document.getElementById('product').value;
+      const price = document.getElementById('price').value;
+      const date = document.getElementById('deliveryDate').value;
+      const comment = document.getElementById('comment').value;
+      const status = document.getElementById('status').value;
+
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      orders.push({ client, product, price, date, comment, status });
+      localStorage.setItem('orders', JSON.stringify(orders));
+
+      form.reset();
+      loadOrders();
+    });
+
+    function deleteOrder(index) {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      orders.splice(index, 1);
+      localStorage.setItem('orders', JSON.stringify(orders));
+      loadOrders();
+    }
+
+    function exportCSV() {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      let csvContent = "data:text/csv;charset=utf-8,Client,Produit,Prix (€),Date de livraison,Commentaire,Statut
+";
+      orders.forEach(o => {
+        csvContent += `${o.client},${o.product},${o.price},${o.date},${o.comment},${o.status}
+`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "commandes.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
